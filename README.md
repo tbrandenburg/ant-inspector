@@ -8,4 +8,4 @@ A live terminal dashboard for ANT+ sensors, built with Textual and OpenANT. Read
 uv run ant-inspector
 ```
 
-On Linux, run `./setup-ant-usb.sh` once if the ANT USB receiver reports access denied, then reconnect it. Set `ANT_WHEEL_CIRCUMFERENCE_M` to show speed in km/h.
+On Linux, run `./setup-ant-usb.sh` once if the ANT USB receiver reports access denied, then reconnect it. Speed defaults to a 2.105 m wheel circumference; override with `ANT_WHEEL_CIRCUMFERENCE_M` if needed.

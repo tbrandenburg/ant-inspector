@@ -8,6 +8,8 @@ import threading
 import time
 from datetime import datetime
 
+DEFAULT_WHEEL_CIRCUMFERENCE_M = 2.105
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Label, ProgressBar, Static
@@ -104,8 +106,9 @@ class AntDashboard(App):
             node = Node()
             self.node = node
             node.set_network_key(0, ANTPLUS_NETWORK_KEY)
-            wheel_circumference = os.getenv("ANT_WHEEL_CIRCUMFERENCE_M")
-            circumference_m = float(wheel_circumference) if wheel_circumference else None
+            circumference_m = float(
+                os.getenv("ANT_WHEEL_CIRCUMFERENCE_M", str(DEFAULT_WHEEL_CIRCUMFERENCE_M))
+            )
             scanner = Scanner(node)
             scanner.on_found = lambda identity: self.events.put(("discovered", identity))
             devices = [HeartRate(node), PowerMeter(node)]
@@ -150,8 +153,12 @@ class AntDashboard(App):
 
             devices[3].on_device_data = separate_speed_data
             devices[4].on_device_data = separate_cadence_data
-            speed_note = "" if wheel_circumference else " • set ANT_WHEEL_CIRCUMFERENCE_M for speed"
-            self.events.put(("status", f"Receiver ready • scanning all ANT+ devices{speed_note}"))
+            self.events.put(
+                (
+                    "status",
+                    f"Receiver ready • scanning all ANT+ devices • wheel {circumference_m:.3f} m",
+                )
+            )
             node.start()
         except Exception as exc:
             self.events.put(("error", f"ANT receiver error: {exc}"))
