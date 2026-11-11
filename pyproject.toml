@@ -1,0 +1,16 @@
+[project]
+name = "ant-inspector-tui"
+version = "0.1.0"
+description = "A terminal dashboard for ANT+ sensor data"
+requires-python = ">=3.10"
+dependencies = ["textual>=1.0", "openant>=1.3"]
+
+[project.scripts]
+ant-inspector = "ant_inspector:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["ant_inspector"]
