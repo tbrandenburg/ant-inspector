@@ -15,6 +15,7 @@ from textual.events import Resize
 from textual.widgets import Footer, Header, Label, ProgressBar, Static
 
 DEFAULT_WHEEL_CIRCUMFERENCE_M = 2.105
+SPEED_STOP_TIMEOUT_S = 3.0
 _DIGITS = {
     "0": ("111", "101", "101", "101", "111"),
     "1": ("010", "110", "010", "010", "111"),
@@ -105,6 +106,9 @@ class AntDashboard(App):
         self.last_packet = 0.0
         self.log_lines: list[str] = []
         self.speed_value = "----"
+        self.last_wheel_revolution: int | None = None
+        self.last_wheel_motion = 0.0
+        self.speed_is_moving = False
 
     def compose(self) -> ComposeResult:
         if self.speed_only:
@@ -198,16 +202,27 @@ class AntDashboard(App):
                 devices[1].on_device_data = power_data
 
             def speed_cadence_data(_page: int, name: str, data: object) -> None:
-                if name == "bike_speed" and data.calculated_speed is not None:
-                    self.events.put(("metric", ("speed", f"{data.calculated_speed:.1f}")))
+                if name == "bike_speed":
+                    current_rev = data.cumulative_speed_revolution[1]
+                    if self.last_wheel_revolution is not None and current_rev != self.last_wheel_revolution:
+                        self.last_wheel_motion = time.monotonic()
+                        self.speed_is_moving = True
+                        if data.calculated_speed is not None:
+                            self.events.put(("metric", ("speed", f"{data.calculated_speed:.1f}")))
+                    self.last_wheel_revolution = current_rev
                 elif name == "bike_cadence" and data.calculated_cadence is not None:
                     self.events.put(("metric", ("cadence", str(round(data.calculated_cadence)))))
 
             speed_cadence.on_device_data = speed_cadence_data
 
             def separate_speed_data(_page: int, _name: str, data: object) -> None:
-                if circumference_m and data.calculate_speed(circumference_m) is not None:
-                    self.events.put(("metric", ("speed", f"{data.calculated_speed:.1f}")))
+                current_rev = data.cumulative_speed_revolution[1]
+                if self.last_wheel_revolution is not None and current_rev != self.last_wheel_revolution:
+                    self.last_wheel_motion = time.monotonic()
+                    self.speed_is_moving = True
+                    if circumference_m and data.calculate_speed(circumference_m) is not None:
+                        self.events.put(("metric", ("speed", f"{data.calculated_speed:.1f}")))
+                self.last_wheel_revolution = current_rev
 
             def separate_cadence_data(_page: int, _name: str, data: object) -> None:
                 if data.calculate_cadence() is not None:
@@ -274,6 +289,14 @@ class AntDashboard(App):
                 self.packet_count += 1
                 self.last_packet = time.monotonic()
                 self.log_lines.append(f"{datetime.now():%H:%M:%S}  {metric_id.upper():4} {metric_value}")
+
+        if self.speed_is_moving and time.monotonic() - self.last_wheel_motion >= SPEED_STOP_TIMEOUT_S:
+            self.speed_is_moving = False
+            if self.speed_only:
+                self.speed_value = "0.0"
+                self.refresh_speed_art()
+            else:
+                self.query_one("#speed", Metric).update_value("0.0")
 
         if self.speed_only:
             return
